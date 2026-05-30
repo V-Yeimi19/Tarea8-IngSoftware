@@ -444,26 +444,6 @@ Partición 2: Mensajes con transaction_id terminados en 2, 5, 8...
 - Escalabilidad horizontal: Si aumenta carga, agregar particiones
 - Order por partition key (transaction_id) garantizado
 
-### 7.4 ¿Por qué SQLite en rewards_service?
-
-| BD | Pros | Contras |
-|----|------|---------|
-| **SQLite** | Desarrollo rápido, cero setup, cobertura fácil | Single file, no escalable |
-| **PostgreSQL** | Escalable, transacciones ACID | Setup, infraestructura |
-| **MongoDB** | Schema-flexible | Replicación compleja |
-
-**Decisión**: SQLite es suficiente para una tarea académica. En producción sería PostgreSQL.
-
-### 7.5 ¿Por qué SMTP, no API de terceros?
-
-| Opción | Pros | Contras |
-|--------|------|---------|
-| **SMTP Gmail** | Bajo costo, simple | Rate limiting, no tracking |
-| **SendGrid API** | Tracking, reliability | Costo, dependencia |
-| **AWS SES** | Escalable | Setup AWS, costo |
-
-**Decisión**: SMTP es suficiente para demostración. SendGrid sería mejor en producción.
-
 ---
 
 ## 8. Conclusión
