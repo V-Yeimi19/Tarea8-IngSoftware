@@ -1,0 +1,756 @@
+{
+  "info": {
+    "name": "Sistema de Recompensas - Restaurantes",
+    "description": "Colección para probar los endpoints del sistema de fidelización basado en eventos con Apache Kafka.\n\n**Flujo completo:**\n1. Verificar salud del servicio (`GET /health`)\n2. Registrar una cena (`POST /api/v1/meals`) — el `transaction_id` se guarda automáticamente en la variable de entorno `transactionId`\n3. Consultar la transacción creada (`GET /api/v1/meals/:transactionId`)\n4. Probar casos de error (monto inválido, campos faltantes, UUID inexistente)\n\n**Variable de entorno requerida:** `baseUrl` (default: `http://localhost:8000`)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000",
+      "type": "string",
+      "description": "URL base del restaurant_service"
+    },
+    {
+      "key": "transactionId",
+      "value": "",
+      "type": "string",
+      "description": "Se llena automáticamente al ejecutar POST /api/v1/meals"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health Check",
+      "item": [
+        {
+          "name": "GET /health - Servicio activo",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            },
+            "description": "Verifica que el servicio esté activo. Retorna `status: ok` y el nombre del servicio."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code es 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('El campo status es ok', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.status).to.eql('ok');",
+                  "});",
+                  "",
+                  "pm.test('El campo service está presente', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('service');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n  \"status\": \"ok\",\n  \"service\": \"restaurant_service\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Registrar Cena (POST /api/v1/meals)",
+      "item": [
+        {
+          "name": "Tier Standard (S/ 45.00)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"card_number\": \"4532-YEIMI-0001\",\n  \"restaurant_code\": \"REST-001\",\n  \"amount\": 45.00,\n  \"customer_email\": \"cliente@ejemplo.com\"\n}",
+              "options": {"raw": {"language": "json"}}
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/meals",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "meals"]
+            },
+            "description": "Registra una cena de S/ 45.00 → Tier Standard.\n\n**Recompensas esperadas:**\n- Puntos: `floor(45 × 0.5)` = **22 pts**\n- Cashback: `45 × 2.5%` = **S/ 1.13**\n\nEl `transaction_id` de la respuesta se guarda automáticamente en la variable `transactionId`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code es 201 Created', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('La respuesta contiene transaction_id', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('transaction_id');",
+                  "    pm.expect(json.transaction_id).to.be.a('string').and.not.empty;",
+                  "});",
+                  "",
+                  "pm.test('card_number coincide con el enviado', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.card_number).to.eql('4532-YEIMI-0001');",
+                  "});",
+                  "",
+                  "pm.test('restaurant_code coincide con el enviado', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.restaurant_code).to.eql('REST-001');",
+                  "});",
+                  "",
+                  "pm.test('currency es PEN', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.currency).to.eql('PEN');",
+                  "});",
+                  "",
+                  "pm.test('timestamp está presente', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('timestamp');",
+                  "});",
+                  "",
+                  "// Guardar transaction_id para la siguiente solicitud",
+                  "const json = pm.response.json();",
+                  "if (json.transaction_id) {",
+                  "    pm.collectionVariables.set('transactionId', json.transaction_id);",
+                  "    console.log('transactionId guardado:', json.transaction_id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "201 Created",
+              "status": "Created",
+              "code": 201,
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n  \"transaction_id\": \"550e8400-e29b-41d4-a716-446655440000\",\n  \"card_number\": \"4532-YEIMI-0001\",\n  \"restaurant_code\": \"REST-001\",\n  \"amount\": \"45.00\",\n  \"currency\": \"PEN\",\n  \"timestamp\": \"2026-05-29T14:30:00.000000+00:00\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Tier Silver (S/ 100.00)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"card_number\": \"4532-YEIMI-0002\",\n  \"restaurant_code\": \"REST-002\",\n  \"amount\": 100.00,\n  \"customer_email\": \"silver@ejemplo.com\"\n}",
+              "options": {"raw": {"language": "json"}}
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/meals",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "meals"]
+            },
+            "description": "Registra una cena de S/ 100.00 → Tier Silver.\n\n**Recompensas esperadas:**\n- Puntos: `floor(100 × 1.0)` = **100 pts**\n- Cashback: `100 × 3.0%` = **S/ 3.00**"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code es 201 Created', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('La respuesta contiene transaction_id', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.transaction_id).to.be.a('string').and.not.empty;",
+                  "});",
+                  "",
+                  "pm.test('El amount refleja S/ 100.00', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(parseFloat(json.amount)).to.eql(100);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "if (json.transaction_id) {",
+                  "    pm.collectionVariables.set('transactionId', json.transaction_id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Tier Gold (S/ 200.00)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"card_number\": \"4532-YEIMI-0003\",\n  \"restaurant_code\": \"REST-003\",\n  \"amount\": 200.00,\n  \"customer_email\": \"gold@ejemplo.com\"\n}",
+              "options": {"raw": {"language": "json"}}
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/meals",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "meals"]
+            },
+            "description": "Registra una cena de S/ 200.00 → Tier Gold.\n\n**Recompensas esperadas:**\n- Puntos: `floor(200 × 1.5)` = **300 pts**\n- Cashback: `200 × 4.0%` = **S/ 8.00**"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code es 201 Created', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('La respuesta contiene transaction_id', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.transaction_id).to.be.a('string').and.not.empty;",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "if (json.transaction_id) {",
+                  "    pm.collectionVariables.set('transactionId', json.transaction_id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Tier Platinum (S/ 500.00)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"card_number\": \"4532-YEIMI-VIP\",\n  \"restaurant_code\": \"REST-VIP\",\n  \"amount\": 500.00,\n  \"customer_email\": \"vip@ejemplo.com\"\n}",
+              "options": {"raw": {"language": "json"}}
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/meals",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "meals"]
+            },
+            "description": "Registra una cena de S/ 500.00 → Tier Platinum.\n\n**Recompensas esperadas:**\n- Puntos: `floor(500 × 2.0)` = **1000 pts**\n- Cashback: `500 × 5.0%` = **S/ 25.00**"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code es 201 Created', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('La respuesta contiene transaction_id', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.transaction_id).to.be.a('string').and.not.empty;",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "if (json.transaction_id) {",
+                  "    pm.collectionVariables.set('transactionId', json.transaction_id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sin email (campo opcional)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"card_number\": \"4532-SIN-EMAIL\",\n  \"restaurant_code\": \"REST-001\",\n  \"amount\": 75.00\n}",
+              "options": {"raw": {"language": "json"}}
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/meals",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "meals"]
+            },
+            "description": "Registra una cena sin `customer_email`. El campo es opcional y debe retornar 201 de igual manera."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code es 201 aun sin email', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Consultar Transacción (GET /api/v1/meals/:id)",
+      "item": [
+        {
+          "name": "GET - Transacción existente",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/meals/{{transactionId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "meals", "{{transactionId}}"]
+            },
+            "description": "Consulta la transacción cuyo ID fue guardado al ejecutar `POST /api/v1/meals`.\n\nEjecuta primero cualquier request de registro para que la variable `transactionId` esté disponible."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const txId = pm.collectionVariables.get('transactionId');",
+                  "if (!txId) {",
+                  "    console.warn('transactionId está vacío. Ejecuta primero POST /api/v1/meals.');",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code es 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('transaction_id coincide con la variable guardada', function () {",
+                  "    const json = pm.response.json();",
+                  "    const expected = pm.collectionVariables.get('transactionId');",
+                  "    pm.expect(json.transaction_id).to.eql(expected);",
+                  "});",
+                  "",
+                  "pm.test('La respuesta contiene todos los campos requeridos', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.all.keys(",
+                  "        'transaction_id', 'card_number', 'restaurant_code',",
+                  "        'amount', 'currency', 'timestamp'",
+                  "    );",
+                  "});",
+                  "",
+                  "pm.test('currency es PEN', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.currency).to.eql('PEN');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n  \"transaction_id\": \"550e8400-e29b-41d4-a716-446655440000\",\n  \"card_number\": \"4532-YEIMI-0001\",\n  \"restaurant_code\": \"REST-001\",\n  \"amount\": \"45.00\",\n  \"currency\": \"PEN\",\n  \"timestamp\": \"2026-05-29T14:30:00.000000+00:00\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Casos de Error (422 / 404)",
+      "item": [
+        {
+          "name": "422 - Monto negativo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"card_number\": \"4532-ERROR-001\",\n  \"restaurant_code\": \"REST-001\",\n  \"amount\": -50.00\n}",
+              "options": {"raw": {"language": "json"}}
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/meals",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "meals"]
+            },
+            "description": "El campo `amount` tiene la restricción `gt=0`. Un monto negativo retorna 422 Unprocessable Entity."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code es 422', function () {",
+                  "    pm.response.to.have.status(422);",
+                  "});",
+                  "",
+                  "pm.test('La respuesta contiene detalle del error', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('detail');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "422 Unprocessable Entity",
+              "status": "Unprocessable Entity",
+              "code": 422,
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n  \"detail\": [\n    {\n      \"type\": \"greater_than\",\n      \"loc\": [\"body\", \"amount\"],\n      \"msg\": \"Input should be greater than 0\",\n      \"input\": \"-50.0\"\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "422 - Monto cero",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"card_number\": \"4532-ERROR-002\",\n  \"restaurant_code\": \"REST-001\",\n  \"amount\": 0\n}",
+              "options": {"raw": {"language": "json"}}
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/meals",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "meals"]
+            },
+            "description": "Un monto de 0 también viola la restricción `gt=0`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code es 422', function () {",
+                  "    pm.response.to.have.status(422);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "422 - Falta card_number",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"restaurant_code\": \"REST-001\",\n  \"amount\": 100.00\n}",
+              "options": {"raw": {"language": "json"}}
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/meals",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "meals"]
+            },
+            "description": "`card_number` es un campo requerido. Omitirlo retorna 422."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code es 422', function () {",
+                  "    pm.response.to.have.status(422);",
+                  "});",
+                  "",
+                  "pm.test('El error menciona card_number', function () {",
+                  "    const body = pm.response.text();",
+                  "    pm.expect(body).to.include('card_number');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "422 - Falta restaurant_code",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"card_number\": \"4532-ERROR-004\",\n  \"amount\": 100.00\n}",
+              "options": {"raw": {"language": "json"}}
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/meals",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "meals"]
+            },
+            "description": "`restaurant_code` es un campo requerido. Omitirlo retorna 422."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code es 422', function () {",
+                  "    pm.response.to.have.status(422);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "422 - Monto no numérico",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"card_number\": \"4532-ERROR-005\",\n  \"restaurant_code\": \"REST-001\",\n  \"amount\": \"no-es-numero\"\n}",
+              "options": {"raw": {"language": "json"}}
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/meals",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "meals"]
+            },
+            "description": "Un amount con valor no numérico falla la validación Pydantic."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code es 422', function () {",
+                  "    pm.response.to.have.status(422);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "404 - Transacción inexistente",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/meals/00000000-0000-0000-0000-000000000000",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "meals", "00000000-0000-0000-0000-000000000000"]
+            },
+            "description": "Consultar un UUID válido que no existe en el repositorio retorna 404 Not Found."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code es 404', function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "",
+                  "pm.test('El mensaje indica not found', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.detail.toLowerCase()).to.include('not found');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "404 Not Found",
+              "status": "Not Found",
+              "code": 404,
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n  \"detail\": \"Transaction 00000000-0000-0000-0000-000000000000 not found\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "422 - UUID inválido en path",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/meals/no-es-un-uuid",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "meals", "no-es-un-uuid"]
+            },
+            "description": "Pasar un string que no es UUID válido en el path retorna 422."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code es 422', function () {",
+                  "    pm.response.to.have.status(422);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Flujo Completo (Runner)",
+      "item": [
+        {
+          "name": "1. Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            },
+            "description": "Paso 1 del flujo: verificar que el servicio está activo."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Servicio activo', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.json().status).to.eql('ok');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2. Registrar cena Gold y guardar ID",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"card_number\": \"4532-FLOW-TEST\",\n  \"restaurant_code\": \"REST-GOLD\",\n  \"amount\": 250.00,\n  \"customer_email\": \"flujo@ejemplo.com\"\n}",
+              "options": {"raw": {"language": "json"}}
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/meals",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "meals"]
+            },
+            "description": "Paso 2: registrar una cena Gold (S/ 250). Guarda el `transaction_id` para el paso 3.\n\n**Recompensas esperadas:**\n- Puntos: `floor(250 × 1.5)` = **375 pts**\n- Cashback: `250 × 4.0%` = **S/ 10.00**"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Cena registrada con 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('transactionId', json.transaction_id);",
+                  "console.log('transactionId guardado:', json.transaction_id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3. Consultar transacción registrada",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/meals/{{transactionId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "meals", "{{transactionId}}"]
+            },
+            "description": "Paso 3: consultar la transacción registrada en el paso 2 usando el `transactionId` guardado."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Transacción encontrada con 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('El transaction_id coincide', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.transaction_id).to.eql(pm.collectionVariables.get('transactionId'));",
+                  "});",
+                  "",
+                  "pm.test('El amount es 250', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(parseFloat(json.amount)).to.eql(250);",
+                  "});",
+                  "",
+                  "pm.test('Flujo completo exitoso', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "    console.log('Flujo completo: Health → POST /meals → GET /meals/:id completado correctamente');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

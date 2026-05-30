@@ -1,0 +1,6 @@
+projectKey=Yeimi_Varela_t1
+serverUrl=https://sonarqube.ingsoftware.lat
+serverVersion=26.5.0.122743
+dashboardUrl=https://sonarqube.ingsoftware.lat/dashboard?id=Yeimi_Varela_t1
+ceTaskId=a84a1b7a-327b-412a-95a3-07579e340a82
+ceTaskUrl=https://sonarqube.ingsoftware.lat/api/ce/task?id=a84a1b7a-327b-412a-95a3-07579e340a82

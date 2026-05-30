@@ -1,0 +1,24 @@
+[coverage:run]
+relative_files = True
+source = restaurant_service, rewards_service, notification_service, shared
+omit =
+    */.venv/*
+    */tests/*
+    */conftest.py
+    */__init__.py
+    producer-kafka.py
+    consumer-kafka.py
+
+[coverage:report]
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    if __name__ == .__main__.:
+    raise NotImplementedError
+    pass
+    \.\.\.
+    if TYPE_CHECKING:
+    @abstractmethod
+
+[coverage:xml]
+output = coverage.xml
