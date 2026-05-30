@@ -7,6 +7,12 @@ Sistema de fidelización basado en arquitectura orientada a eventos (EDA) con Ap
 
 ---
 
+## Casos de Uso
+
+![Diagrama de Casos de Uso](CasoDeUso.png)
+
+---
+
 ## Arquitectura
 
 ```

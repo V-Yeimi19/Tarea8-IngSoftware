@@ -67,8 +67,5 @@ data/
 *.sqlite
 *.sqlite3
 
-# Other
-.env.example
-
 #IA
 .claude
